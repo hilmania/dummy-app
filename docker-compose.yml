@@ -1,0 +1,38 @@
+version: "3"
+
+services: 
+  express:
+    deploy: 
+      replicas: 2
+    build: .
+    ports:
+      - "3000-3001:3000"
+    restart: always
+    healthcheck:
+      test: curl http://127.0.0.1:3000 -s -f -o /dev/null || exit 1
+      interval: 10s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "traefik.frontend.rule=PathPrefixStrip:/"
+      - "traefik.http.services.express.loadbalancer.server.port=3000"
+
+  autoheal: 
+    restart : always
+    image: willfarrell/autoheal
+    environment: 
+      - AUTOHEAL_CONTAINER_LABEL=all 
+    volumes: 
+      - /var/run/docker.sock:/var/run/docker.sock
+  reverse-proxy:
+    image: traefik
+    command: 
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "8081:80" # The HTTP Port
+      - "8082:8080" # The Web UI (enabled by --api)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
